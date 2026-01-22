@@ -1,72 +1,72 @@
-# Secure Multi-Client Messaging Application
+# Aplicação de Mensageria Segura Multi-Cliente
 
-## 🎯 Overview
-This project implements a secure messaging application with a central server, guaranteeing:
-*   **Confidentiality**: AES-128-GCM Encryption.
-*   **Integrity**: GCM Authentication Tags.
-*   **Authenticity**: RSA Signatures & Certificates.
-*   **Forward Secrecy**: ECDHE (Elliptic Curve Diffie-Hellman Ephemeral).
-*   **Anti-Replay**: Monotonically increasing sequence numbers with server-side validation.
+## 🎯 Visão Geral
+Este projeto implementa uma aplicação de chat segura com um servidor central, garantindo:
+*   **Confidencialidade**: Criptografia AES-128-GCM.
+*   **Integridade**: Tags de Autenticação GCM.
+*   **Autenticidade**: Assinaturas RSA e Certificados X.509.
+*   **Sigilo Perfeito (Forward Secrecy)**: ECDHE (Elliptic Curve Diffie-Hellman Ephemeral).
+*   **Anti-Replay**: Números de sequência monotônicos com validação no servidor.
 
-## 📂 Structure
-*   `secure_chat/certs/`: Stores Server RSA Key and Certificate.
-*   `secure_chat/core/security.py`: Cryptographic primitives (ECDHE, HKDF, AES-GCM).
-*   `secure_chat/core/protocol.py`: Network packet structure definition.
-*   `secure_chat/server.py`: Central server handling multiple clients.
-*   `secure_chat/client.py`: Client CLI.
-*   `secure_chat/setup_pki.py`: Initialization script.
-*   `secure_chat/tests/`: Unit tests and attack simulations.
+## 📂 Estrutura
+*   `secure_chat/certs/`: Armazena a Chave Privada RSA e o Certificado do Servidor.
+*   `secure_chat/core/security.py`: Primitivas criptográficas (ECDHE, HKDF, AES-GCM).
+*   `secure_chat/core/protocol.py`: Definição da estrutura dos pacotes de rede.
+*   `secure_chat/server.py`: Servidor central que gerencia múltiplos clientes.
+*   `secure_chat/client.py`: Interface de Linha de Comando (CLI) do Cliente.
+*   `secure_chat/setup_pki.py`: Script de inicialização da infraestrutura de chaves.
+*   `secure_chat/tests/`: Testes unitários e simulações de ataques.
 
-## 🚀 How to Run
+## 🚀 Como Rodar
 
-### 1. Prerequisites
-Install dependencies:
+### 1. Pré-requisitos
+Instale as dependências:
 ```bash
 pip install cryptography
 ```
 
-### 2. Initialization (Phase 1)
-Generate the Server's Identity (RSA Key + Self-Signed Certificate):
+### 2. Inicialização (Fase 1)
+Gere a Identidade do Servidor (Chave RSA + Certificado Autoassinado):
 ```bash
 cd secure_chat
 python3 setup_pki.py
 ```
-*Creates `certs/server_key.pem` and `certs/server_cert.pem`.*
+*Isso cria os arquivos `certs/server_key.pem` e `certs/server_cert.pem`.*
 
-### 3. Start Server
+### 3. Iniciar o Servidor
 ```bash
 python3 server.py
 ```
-*Server listens on 0.0.0.0:8000.*
+*O servidor ficará escutando em 0.0.0.0:8000.*
 
-### 4. Start Clients
-Open new terminals for each client:
+### 4. Iniciar Clientes
+Abra novos terminais para cada cliente:
 ```bash
-# Client A (Alice)
+# Cliente A (Alice)
 python3 client.py Alice
 ```
 ```bash
-# Client B (Bob)
+# Cliente B (Bob)
 python3 client.py Bob
 ```
 
-### 5. Send Messages
-In Alice's terminal:
+### 5. Enviar Mensagens
+No terminal da Alice:
 ```text
-@Bob Hello Bob, this is a secure message!
+@Bob Ola Bob, esta mensagem eh segura!
 ```
 
-## 🛡️ Security Verification
-To verify **Anti-Replay** protection:
-1. Ensure Server is running.
-2. Run the attack script:
+## 🛡️ Verificação de Segurança
+Para verificar a proteção **Anti-Replay**:
+1. Certifique-se de que o Servidor está rodando.
+2. Execute o script de ataque:
 ```bash
 python3 tests/attack_replay.py
 ```
-**Expected Output**: The script will send a valid packet, verify it works, then resend it. The script should report `[SUCCESS] Connection Reset` or server disconnection.
+**Resultado Esperado**: O script enviará um pacote válido, verificará seu funcionamento e depois tentará reenviá-lo. O script deve reportar `[SUCESSO] Conexão Reiniciada` ou desconexão pelo servidor.
 
-## 🧪 Unit Tests
-Run the cryptographic core tests:
+## 🧪 Testes Unitários
+Execute os testes do núcleo criptográfico:
 ```bash
 python3 -m unittest tests/test_crypto.py
 ```

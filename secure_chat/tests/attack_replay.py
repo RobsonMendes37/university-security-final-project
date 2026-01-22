@@ -1,10 +1,10 @@
 import socket
-# Updated to align with server signature changes (implicit)
+# Atualizado para alinhar com as mudancas de assinatura do servidor (implicito)
 import struct
 import os
 import time
 import sys
-# Add parent dir to path to import core
+# Adicionar diretorio pai ao path para importar core
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.security import SecurityManager
@@ -15,8 +15,8 @@ PORT = 8000
 SERVER_ID = b'SERVER'
 
 def run_attack():
-    print("[*] Starting Replay Attack Simulation...")
-    client_id = b'ATTACKER'
+    print("[*] Iniciando Simulacao de Ataque de Replay...")
+    client_id = b'ATACANTE'
     sm = SecurityManager()
     
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -24,24 +24,23 @@ def run_attack():
         sock.connect((HOST, PORT))
         
         # --- HANDSHAKE ---
-        print("[*] Performing Handshake...")
+        print("[*] Realizando Handshake...")
         sk_c, pk_c_bytes = sm.generate_ecdh_keys()
         
-        # Send Hello
+        # Enviar Hello
         packet = pack_packet(os.urandom(12), client_id, SERVER_ID, 0, pk_c_bytes)
         sock.sendall(packet)
         
-        # Recv Hello
+        # Receber Hello
         header_data = sock.recv(HEADER_SIZE)
-        if not header_data: raise Exception("Conn Closed")
+        if not header_data: raise Exception("Conexao Fechada")
         _, _, _, _, payload_len = unpack_header(header_data)
         
         response_payload = b''
         while len(response_payload) < payload_len:
             response_payload += sock.recv(payload_len - len(response_payload))
             
-        # Parse Salt/Key (Simplified: we assume it works if we got here, just need keys to encrypt)
-        # We need to parse to get salt to derive keys
+        # Parse Salt/Key (Simplificado: assumimos que funciona se chegamos aqui)
         offset = 0
         pk_s_len = struct.unpack("!I", response_payload[offset:offset+4])[0]
         offset += 4
@@ -50,12 +49,12 @@ def run_attack():
         
         cert_len = struct.unpack("!I", response_payload[offset:offset+4])[0]
         offset += 4
-        # Skip cert
+        # Pular cert
         offset += cert_len
         
         sig_len = struct.unpack("!I", response_payload[offset:offset+4])[0]
         offset += 4
-        # Skip sig
+        # Pular sig
         offset += sig_len
         
         salt = response_payload[offset:offset+16]
@@ -63,14 +62,14 @@ def run_attack():
         shared_secret = sm.compute_shared_secret(sk_c, pk_s_bytes)
         key_c2s, key_s2c = sm.derive_keys(shared_secret, salt)
         
-        print("[+] Handshake Done. Keys Derived.")
+        print("[+] Handshake Feito. Chaves Derivadas.")
         
-        # --- ATTACK ---
-        print("[*] Generating Valid Packet (Seq 1)...")
+        # --- ATAQUE ---
+        print("[*] Gerando Pacote Valido (Seq 1)...")
         seq = 1
         nonce = os.urandom(12)
-        plaintext = b"This is a valid message"
-        recipient = b"VICTIM"
+        plaintext = b"Esta eh uma mensagem valida"
+        recipient = b"VITIMA"
         
         dummy_header = pack_packet(nonce, client_id, recipient, seq, b'')
         aad = get_aad(dummy_header[:HEADER_SIZE])
@@ -78,29 +77,29 @@ def run_attack():
         
         valid_packet = pack_packet(nonce, client_id, recipient, seq, ciphertext)
         
-        print("[*] Sending Packet FIRST TIME (Should succeed)...")
+        print("[*] Enviando Pacote PRIMEIRA VEZ (Deve funcionar)...")
         sock.sendall(valid_packet)
         
         time.sleep(1) 
         
-        print("[*] Sending Packet SECOND TIME (REPLAY) (Should be rejected)...")
+        print("[*] Enviando Pacote SEGUNDA VEZ (REPLAY) (Deve ser rejeitado)...")
         try:
             sock.sendall(valid_packet)
             
-            # Try to read response or check if closed
+            # Tentar ler resposta ou verificar se fechou
             sock.settimeout(2)
             data = sock.recv(1024)
             if not data:
-                print("[SUCCESS] Server closed connection (EOF). Attack Mitigated!")
+                print("[SUCESSO] Servidor fechou a conexao (EOF). Ataque Mitigado!")
             else:
-                 print("[?] Server sent data back. Check logs.")
+                 print("[?] Servidor enviou dados de volta. Verifique logs.")
         except socket.timeout:
-             print("[?] Socket timeout. Server might have silently dropped it or kept alive.")
+             print("[?] Timeout do socket. Servidor pode ter descartado silenciosamente.")
         except ConnectionResetError:
-             print("[SUCCESS] Connection Reset by Server. Attack Mitigated!")
+             print("[SUCESSO] Conexao Reiniciada pelo Servidor. Ataque Mitigado!")
         
     except Exception as e:
-        print(f"[!] Error: {e}")
+        print(f"[!] Erro: {e}")
     finally:
         sock.close()
 

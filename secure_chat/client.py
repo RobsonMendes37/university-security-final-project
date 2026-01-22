@@ -6,7 +6,7 @@ import struct
 from core.security import SecurityManager
 from core.protocol import pack_packet, unpack_header, get_aad, HEADER_SIZE
 
-# Configuration
+# Configuracao
 HOST = '127.0.0.1'
 PORT = 8000
 SERVER_ID = b'SERVER'
@@ -26,40 +26,40 @@ class SecureClient:
             self.conn.connect((HOST, PORT))
             self.perform_handshake()
             
-            # Start Listen Thread
+            # Iniciar Thread de Escuta
             threading.Thread(target=self.listen_loop, daemon=True).start()
             
-            # Input Loop
+            # Loop de Entrada
             self.input_loop()
         except KeyboardInterrupt:
-            print("\n[-] Exiting...")
+            print("\n[-] Saindo...")
         except Exception as e:
-            print(f"[-] Error: {e}")
+            print(f"[-] Erro: {e}")
         finally:
             self.conn.close()
 
     def perform_handshake(self):
-        print("[*] Starting Handshake...")
+        print("[*] Iniciando Handshake...")
         
-        # 1. Generate Client Ephemeral Keys
+        # 1. Gerar Chaves Efemeras do Cliente
         sk_c, pk_c_bytes = self.sm.generate_ecdh_keys()
         
-        # 2. Send Client Hello (Client ID + pk_C)
-        # Using protocol pack but payload is plaintext
-        payload = pk_c_bytes # just the key
+        # 2. Enviar Client Hello (ID do Cliente + pk_C)
+        # Usando pacote do protocolo mas payload em texto claro
+        payload = pk_c_bytes # apenas a chave
         packet = pack_packet(
             os.urandom(12), self.client_id, SERVER_ID, 0, payload
         )
         self.conn.sendall(packet)
         
-        # 3. Receive Server Hello
-        # Format: Header + [pk_S_len][pk_S][cert_len][cert][sig_len][sig][salt]
+        # 3. Receber Server Hello
+        # Formato: Cabecalho + [pk_S_len][pk_S][cert_len][cert][sig_len][sig][salt]
         header_data = self.read_exact(HEADER_SIZE)
         nonce, sender, recipient, seq, payload_len = unpack_header(header_data)
         
         response_payload = self.read_exact(payload_len)
         
-        # Unpack Payload
+        # Desempacotar Payload
         offset = 0
         pk_s_len = struct.unpack("!I", response_payload[offset:offset+4])[0]
         offset += 4
@@ -76,23 +76,23 @@ class SecureClient:
         signature = response_payload[offset:offset+sig_len]
         offset += sig_len
         
-        salt = response_payload[offset:offset+16] # Salt is 16 bytes
+        salt = response_payload[offset:offset+16] # Salt tem 16 bytes
         
-        # 4. Verify Signature
-        # Data = pk_S || client_id || salt || pk_C
-        # We must verify that the server signed OUR public key (Transcript integrity)
+        # 4. Verificar Assinatura
+        # Dados = pk_S || client_id || salt || pk_C
+        # Devemos verificar que o servidor assinou NOSSA chave publica (Integridade do Transcript)
         data_to_verify = pk_s_bytes + self.client_id + salt + pk_c_bytes
         if not self.sm.verify_handshake(cert_bytes, signature, data_to_verify):
-            raise Exception("Server Signature Verification Failed! Potential MitM.")
-        print("[+] Server Signature Verified.")
+            raise Exception("Verificacao de Assinatura do Servidor Falhou! Potencial MitM.")
+        print("[+] Assinatura do Servidor Verificada.")
         
-        # 5. Derive Keys
+        # 5. Derivar Chaves
         shared_secret = self.sm.compute_shared_secret(sk_c, pk_s_bytes)
         key_c2s, key_s2c = self.sm.derive_keys(shared_secret, salt)
         self.keys = {"c2s": key_c2s, "s2c": key_s2c}
         self.salt = salt
-        print("[+] Handshake Complete. Secure Channel Established.")
-        print("Usage: @recipient message")
+        print("[+] Handshake Completo. Canal Seguro Estabelecido.")
+        print("Uso: @destinatario mensagem")
 
     def input_loop(self):
         while True:
@@ -102,28 +102,27 @@ class SecureClient:
             if msg.startswith("@"):
                 try:
                     target, text = msg.split(" ", 1)
-                    recipient_id = target[1:].encode() # remove @
+                    recipient_id = target[1:].encode() # remover @
                     
                     self.send_message(recipient_id, text.encode())
                 except ValueError:
-                    print("[!] Invalid format. Use: @recipient message")
+                    print("[!] Formato invalido. Use: @destinatario mensagem")
             else:
-                 print("[!] Invalid format. Use: @recipient message")
+                 print("[!] Formato invalido. Use: @destinatario mensagem")
 
     def send_message(self, recipient_id, plaintext):
         self.counters['send'] += 1
         seq_no = self.counters['send']
         nonce = os.urandom(12)
         
-        # Construct Dummy Header to get AAD
-        # pack_packet ensures padding matches
+        # Construir Cabecalho Dummy para obter AAD
         dummy_header = pack_packet(nonce, self.client_id, recipient_id, seq_no, b'')
         aad = get_aad(dummy_header[:HEADER_SIZE])
         
-        # Encrypt
+        # Cifrar
         ciphertext = self.sm.encrypt_with_nonce(self.keys['c2s'], nonce, plaintext, aad)
         
-        # Pack
+        # Empacotar
         packet = pack_packet(nonce, self.client_id, recipient_id, seq_no, ciphertext)
         self.conn.sendall(packet)
 
@@ -135,15 +134,15 @@ class SecureClient:
                 
                 ciphertext = self.read_exact(payload_len)
                 
-                # Decrypt
+                # Decifrar
                 aad = header_data[12:52] 
                 plaintext = self.sm.decrypt(self.keys['s2c'], nonce, ciphertext, aad)
                 
-                print(f"\n[NEW MSG] {sender.rstrip(b'\x00').decode()}: {plaintext.decode()}")
+                print(f"\n[NOVA MSG] {sender.rstrip(b'\x00').decode()}: {plaintext.decode()}")
                 print(f"[{self.client_id.decode()}] > ", end='', flush=True)
                 
             except Exception as e:
-                print(f"\n[!] Connection Error: {e}")
+                print(f"\n[!] Erro de Conexao: {e}")
                 os._exit(1)
 
     def read_exact(self, n):
@@ -151,13 +150,13 @@ class SecureClient:
         while len(data) < n:
             packet = self.conn.recv(n - len(data))
             if not packet:
-                raise ConnectionError("Connection closed")
+                raise ConnectionError("Conexao fechada")
             data += packet
         return data
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python client.py <client_id>")
+        print("Uso: python client.py <client_id>")
         sys.exit(1)
         
     client = SecureClient(sys.argv[1])

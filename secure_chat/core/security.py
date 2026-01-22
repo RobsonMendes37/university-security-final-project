@@ -12,7 +12,7 @@ class SecurityManager:
         self.curve = ec.SECP256R1()
 
     def generate_ecdh_keys(self):
-        """Generates an ephemeral ECDH key pair."""
+        """Gera um par de chaves ECDH efemeras."""
         private_key = ec.generate_private_key(self.curve, self.backend)
         public_key_bytes = private_key.public_key().public_bytes(
             encoding=serialization.Encoding.PEM,
@@ -21,7 +21,7 @@ class SecurityManager:
         return private_key, public_key_bytes
 
     def compute_shared_secret(self, private_key, peer_public_key_bytes):
-        """Computes ECDH shared secret Z."""
+        """Calcula o segredo compartilhado ECDH (Z)."""
         peer_public_key = serialization.load_pem_public_key(
             peer_public_key_bytes,
             backend=self.backend
@@ -31,24 +31,13 @@ class SecurityManager:
 
     def derive_keys(self, shared_secret, salt):
         """
-        Derives session keys using HKDF-SHA256 (TLS 1.3 style).
-        Returns (key_c2s, key_s2c).
+        Deriva chaves de sessao usando HKDF-SHA256 (estilo TLS 1.3).
+        Retorna (key_c2s, key_s2c).
         """
         if not salt:
-            salt = os.urandom(16) # Should be provided by server usually
+            salt = os.urandom(16) # Deve ser fornecido pelo servidor geralmente
 
-        # HKDF Extract & Expand done together or separate. 
-        # Using standard HKDF implementation which does Extract then Expand.
-        # But we need two separate keys with different info labels.
-        # So first we can get a pseudo-random key (PRK) if we want, or just derive twice from the master secret.
-        # The prompt says: HKDF-Extract: PRK = HMAC(salt, Z), then Expand.
-        # The cryptography library HKDF class does Extract+Expand in `derive`.
-        # To do Extract then Expand separately is possible but we can also just run HKDF twice on the common Z 
-        # but that is not strictly TLS 1.3 style (TLS 1.3 derives a handshake secret then application traffic secrets).
-        # We will follow the prompt:
-        # PRK = HMAC(salt, Z) -> logic is inside HKDF(algorithm, length, salt, info)
-        
-        # 1. Derive Key Client-to-Server
+        # 1. Derivar Chave Cliente-para-Servidor
         hkdf_c2s = HKDF(
             algorithm=hashes.SHA256(),
             length=16, # AES-128
@@ -58,7 +47,7 @@ class SecurityManager:
         )
         key_c2s = hkdf_c2s.derive(shared_secret)
 
-        # 2. Derive Key Server-to-Client
+        # 2. Derivar Chave Servidor-para-Cliente
         hkdf_s2c = HKDF(
             algorithm=hashes.SHA256(),
             length=16, # AES-128
@@ -72,8 +61,8 @@ class SecurityManager:
 
     def sign_handshake(self, rsa_private_key, data):
         """
-        Signs data using RSA-SHA256.
-        Data = pk_S || client_id || salt
+        Assina dados usando RSA-SHA256.
+        Dados = pk_S || client_id || salt
         """
         signature = rsa_private_key.sign(
             data,
@@ -87,7 +76,7 @@ class SecurityManager:
 
     def verify_handshake(self, cert_bytes, signature, data):
         """
-        Verifies RSA-SHA256 signature using the server's certificate.
+        Verifica a assinatura RSA-SHA256 usando o certificado do servidor.
         """
         cert = x509.load_pem_x509_certificate(cert_bytes, self.backend)
         public_key = cert.public_key()
@@ -104,31 +93,12 @@ class SecurityManager:
             )
             return True
         except Exception as e:
-            print(f"Verification Failed: {e}")
+            print(f"Verificacao Falhou: {e}")
             return False
-
-    def encrypt(self, key, plaintext, aad):
-        """
-        Encrypts plaintext using AES-128-GCM.
-        Returns nonce + ciphertext + tag.
-        Actually, GCM generates tag automatically.
-        We will return ciphertext + tag. Nonce should be handled outside or appended.
-        The prompts says structure: [nonce] [headers] [ciphertext+tag].
-        For GCM, the nonce is input.
-        """
-        # We need a nonce. GCM needs 12 bytes nonce.
-        # IMPORTANT: The Nonce is usually passed IN because it's part of the header.
-        # So we should probably assume the nonce is derived or passed in.
-        # Wait, the prompt structure says: [nonce] + [IDs] + [seq] + [ciphertext+tag]
-        # And "AAD: sender_id | recipient_id | seq_no"
-        # The encrypt function needs to know the nonce being used.
-        # Let's check prompt requirement: "Nonce: deve ser único por mensagem e por direção."
-        # Usually we pass nonce as argument to encrypt.
-        pass
 
     def encrypt_with_nonce(self, key, nonce, plaintext, aad):
         """
-        Encrypts using AES-GCM with specific nonce.
+        Cifra usando AES-GCM com nonce especifico.
         """
         cipher = Cipher(algorithms.AES(key), modes.GCM(nonce), backend=self.backend)
         encryptor = cipher.encryptor()
@@ -138,10 +108,10 @@ class SecurityManager:
 
     def decrypt(self, key, nonce, ciphertext_with_tag, aad):
         """
-        Decrypts using AES-GCM.
-        Input ciphertext_with_tag is what we received (payload).
+        Decifra usando AES-GCM.
+        Entrada ciphertext_with_tag e' o que recebemos (payload).
         """
-        # GCM tag is usually last 16 bytes
+        # Tag GCM geralmente sao os ultimos 16 bytes
         tag = ciphertext_with_tag[-16:]
         ciphertext = ciphertext_with_tag[:-16]
 
