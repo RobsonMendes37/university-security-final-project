@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+*$py.class
+secure_chat/certs/*.pem
+.DS_Store
+.env
+.venv
+env/
+venv/
