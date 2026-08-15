@@ -1,7 +1,7 @@
 # Aplicação de Mensageria Segura Multi-Cliente
 
 ## 🎯 Visão Geral
-Este projeto implementa uma aplicação de chat segura com um servidor central, garantindo:
+Este projeto implementa uma aplicação de chat com um servidor central, garantindo:
 *   **Confidencialidade**: Criptografia AES-128-GCM.
 *   **Integridade**: Tags de Autenticação GCM.
 *   **Autenticidade**: Assinaturas RSA e Certificados X.509.
